@@ -81,7 +81,7 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
 
 ![image](https://user-images.githubusercontent.com/70302884/96575104-4bab0800-130b-11eb-9d9c-dde7958dd0db.png)
 
-    - 도메인 서열 분리 (내용 업데이트 필요)
+    - 도메인 서열 분리
         - Core Domain:  checkIn : 없어서는 안될 핵심 서비스이며, 연견 Up-time SLA 수준을 99.999% 목표, 배포주기는 app 의 경우 1주일 1회 미만, store 의 경우 1개월 1회 미만
         - Supporting Domain:   point, pay : 경쟁력을 내기위한 서비스이며, SLA 수준은 연간 60% 이상 uptime 목표, 배포주기는 각 팀의 자율이나 표준 스프린트 주기가 1주일 이므로 1주일 1회 이상을 기준으로 함.
         - General Domain:   지도서비스 : Google Maps 등 3rd Party 외부 서비스를 사용하는 것이 경쟁력이 높음 (핑크색으로 이후 전환할 예정)
@@ -111,9 +111,7 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
 ![image](https://user-images.githubusercontent.com/70302884/96577425-937f5e80-130e-11eb-955f-a3da4136dca7.png)
     
     - 고객이 포인트를 사용한다. (ok)
-    - 주문이 취소되면 배달이 취소된다 (ok)
-    - 포인트가 사용되면 적립된 포인트에서 차감한다. (ok) 
-    - 포인트가 차감되면 포인트 내역을 업데이트 한다. (ok)
+    - 포인트가 사용되면 포인트에서 차감한다. (ok) 
 
 
 ### 모델 확인
@@ -127,9 +125,9 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
 ![image](https://user-images.githubusercontent.com/70302884/96577805-2b7d4800-130f-11eb-8408-24367b62315c.png)
 
     - 마이크로 서비스를 넘나드는 시나리오에 대한 트랜잭션 처리
-        - 사용자 포인트 내역처리:  (내용 업데이트 필요)
-        
-
+    - 포인트 결제 처리: 포인트 차감이 완료되지 않으면 결제가 이루어지지 않아야 함.(ACID 트랜잭션 적용) 포인트 결제는 Request-Response 방식 처리
+    - 체크아웃 및 포인트 적립 처리:  checkIn 에서 point 마이크로서비스로 포인트 적립 요청이 전달되는 과정에 있어서 point 마이크로 서비스가 별도의 배포주기를 가지기 때문에 Eventual Consistency 방식으로 트랜잭션 처리함.
+    - 나머지 모든 inter-microservice 트랜잭션: 포인트 적립 상태 등 모든 이벤트에 대해 데이터 일관성의 시점이 크리티컬하지 않은 모든 경우가 대부분이라 판단, Eventual Consistency 를 기본으로 채택함.
 
 
 ## 헥사고날 아키텍처 다이어그램 도출
@@ -147,39 +145,50 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
 분석/설계 단계에서 도출된 헥사고날 아키텍처에 따라, 각 BC별로 대변되는 마이크로 서비스들을 스프링부트와 JPA으로 구현하였다. 구현한 각 서비스를 로컬에서 실행하는 방법은 아래와 같다 (각자의 포트넘버는 8081 ~ 808n 이다)
 
 ```
-cd app
+cd checkIn
 mvn spring-boot:run
 
-cd pay
+cd point
 mvn spring-boot:run 
 
-cd store
+cd pay
 mvn spring-boot:run  
 
-cd customer
+cd customercenter
 python policy-handler.py 
 ```
 
 ## DDD 의 적용
 
-- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 pay 마이크로 서비스). 이때 가능한 현업에서 사용하는 언어 (유비쿼터스 랭귀지)를 그대로 사용하려고 노력했다. 하지만, 일부 구현에 있어서 영문이 아닌 경우는 실행이 불가능한 경우가 있기 때문에 계속 사용할 방법은 아닌것 같다. (Maven pom.xml, Kafka의 topic id, FeignClient 의 서비스 id 등은 한글로 식별자를 사용하는 경우 오류가 발생하는 것을 확인하였다)
+- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 point 마이크로 서비스). 이때 가능한 현업에서 사용하는 언어 (유비쿼터스 랭귀지)를 그대로 사용하려고 노력했다. 하지만, 일부 구현에 있어서 영문이 아닌 경우는 실행이 불가능한 경우가 있기 때문에 계속 사용할 방법은 아닌것 같다. (Maven pom.xml, Kafka의 topic id, FeignClient 의 서비스 id 등은 한글로 식별자를 사용하는 경우 오류가 발생하는 것을 확인하였다)
 
 ```
-package fooddelivery;
+package nosmoke;
 
 import javax.persistence.*;
 import org.springframework.beans.BeanUtils;
 import java.util.List;
 
 @Entity
-@Table(name="결제이력_table")
-public class 결제이력 {
+@Table(name="Earn_table")
+public class Earn {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private String orderId;
-    private Double 금액;
+    private Long checkInId;
+    private Long point;
+    private String status;
+
+    @PostPersist
+    public void onPostPersist(){
+        Earned earned = new Earned();
+        BeanUtils.copyProperties(this, earned);
+        earned.publishAfterCommit();
+
+
+    }
+
 
     public Long getId() {
         return id;
@@ -188,115 +197,182 @@ public class 결제이력 {
     public void setId(Long id) {
         this.id = id;
     }
-    public String getOrderId() {
-        return orderId;
+    public Long getCheckInId() {
+        return checkInId;
     }
 
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
+    public void setCheckInId(Long checkInId) {
+        this.checkInId = checkInId;
     }
-    public Double get금액() {
-        return 금액;
-    }
-
-    public void set금액(Double 금액) {
-        this.금액 = 금액;
+    public Long getPoint() {
+        return point;
     }
 
+    public void setPoint(Long point) {
+        this.point = point;
+    }
+
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
 }
 
 ```
 - Entity Pattern 과 Repository Pattern 을 적용하여 JPA 를 통하여 다양한 데이터소스 유형 (RDB or NoSQL) 에 대한 별도의 처리가 없도록 데이터 접근 어댑터를 자동 생성하기 위하여 Spring Data REST 의 RestRepository 를 적용하였다
 ```
-package fooddelivery;
+package nosmoke;
 
 import org.springframework.data.repository.PagingAndSortingRepository;
 
-public interface 결제이력Repository extends PagingAndSortingRepository<결제이력, Long>{
+public interface EarnRepository extends PagingAndSortingRepository<Earn, Long>{
+
 }
 ```
 - 적용 후 REST API 의 테스트
 ```
-# app 서비스의 주문처리
-http localhost:8081/orders item="통닭"
+# checkIn 서비스의 체크인 처리
+http http://localhost:8081/checkIns smokingAreaId="453!#FEQ"
 
-# store 서비스의 배달처리
-http localhost:8083/주문처리s orderId=1
+# checkIn 서비스의 체크아웃 후 point 서비스의 적립 처리
+http PUT http://localhost:8081/checkIns/1 point=100
 
-# 주문 상태 확인
-http localhost:8081/orders/1
+# 적립 상태 확인
+http http://localhost:8081/checkIns/1
+http http://localhost:8082/earns/1
 
 ```
 
 
 ## Saga
 
-앱프런트 (app) 는 서비스 특성상 많은 사용자의 유입과 상품 정보의 다양한 콘텐츠를 저장해야 하는 특징으로 인해 RDB 보다는 Document DB / NoSQL 계열의 데이터베이스인 Mongo DB 를 사용하기로 하였다. 이를 위해 order 의 선언에는 @Entity 가 아닌 @Document 로 마킹되었으며, 별다른 작업없이 기존의 Entity Pattern 과 Repository Pattern 적용과 데이터베이스 제품의 설정 (application.yml) 만으로 MongoDB 에 부착시켰다
+checkIn 서비스에서 체크아웃 후 point 서비스에서 포인트적립을 Eventual Consistency 방식으로 처리했기 때문에 point 서비스에서 포인트 적립 처리가 완료되면 checkIn 서비스의 상태를 "EARNED"로 업데이트 시켜주는 SAGA 패턴을 적용하였다. 이 기능 역시 비동기 방식으로 checkIn의 PolicyHandler에 처리되도록 구현하였다.
 
 ```
-# Order.java
+package nosmoke;
 
-package fooddelivery;
+import nosmoke.config.kafka.KafkaProcessor;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Service;
 
-@Document
-public class Order {
+import java.util.Optional;
 
-    private String id; // mongo db 적용시엔 id 는 고정값으로 key가 자동 발급되는 필드기 때문에 @Id 나 @GeneratedValue 를 주지 않아도 된다.
-    private String item;
-    private Integer 수량;
+@Service
+public class PolicyHandler{
+    @StreamListener(KafkaProcessor.INPUT)
+    public void onStringEventListener(@Payload String eventString){
+
+    }
+
+    @Autowired
+    CheckInRepository checkInRepository;
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void wheneverEarned_UpdatePoint(@Payload Earned earned){
+
+
+        if(earned.isMe()){
+
+            Optional<CheckIn> checkInOptional = checkInRepository.findById(earned.getCheckInId());
+            CheckIn checkIn = checkInOptional.get();
+            checkIn.setPoint(earned.getPoint());
+            checkIn.setSmokingAreaId(checkIn.getSmokingAreaId());
+            checkIn.setStatus("EARNED");
+
+            checkInRepository.save(checkIn);
+        }
+    }
 
 }
-
-
-# 주문Repository.java
-package fooddelivery;
-
-public interface 주문Repository extends JpaRepository<Order, UUID>{
-}
-
-# application.yml
-
-  data:
-    mongodb:
-      host: mongodb.default.svc.cluster.local
-    database: mongo-example
 
 ```
 
 ## CQRS
 
-고객관리 서비스(customer)의 시나리오인 주문상태, 배달상태 변경에 따라 고객에게 카톡메시지 보내는 기능의 구현 파트는 해당 팀이 python 을 이용하여 구현하기로 하였다. 해당 파이썬 구현체는 각 이벤트를 수신하여 처리하는 Kafka consumer 로 구현되었고 코드는 다음과 같다:
+고객관리 서비스(customercenter)의 시나리오인 체크인/포인트적립, 포인트결제에 따른 포인트차감 내역을 CQRS로 구현하었고 코드는 다음과 같다:
 ```
-from flask import Flask
-from redis import Redis, RedisError
-from kafka import KafkaConsumer
-import os
-import socket
+package nosmoke;
+
+import nosmoke.config.kafka.KafkaProcessor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class MypageViewHandler {
 
 
-# To consume latest messages and auto-commit offsets
-consumer = KafkaConsumer('fooddelivery',
-                         group_id='',
-                         bootstrap_servers=['localhost:9092'])
-for message in consumer:
-    print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition,
-                                          message.offset, message.key,
-                                          message.value))
+    @Autowired
+    private MypageRepository mypageRepository;
 
-    # 카톡호출 API
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenCheckIned_then_CREATE_1 (@Payload CheckIned checkIned) {
+        try {
+            if (checkIned.isMe()) {
+                // view 객체 생성
+                Mypage mypage = new Mypage();
+                // view 객체에 이벤트의 Value 를 set 함
+                mypage.setCheckInId(checkIned.getId());
+                mypage.setSmokingAreaId(checkIned.getSmokingAreaId());
+                // view 레파지 토리에 save
+                mypageRepository.save(mypage);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenPaid_then_CREATE_2 (@Payload Paid paid) {
+        try {
+            if (paid.isMe()) {
+                // view 객체 생성
+                Mypage mypage = new Mypage();
+                // view 객체에 이벤트의 Value 를 set 함
+                mypage.setDeductId(paid.getId());
+                mypage.setPoint(paid.getPoint());
+                // view 레파지 토리에 save
+                mypageRepository.save(mypage);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenEarned_then_UPDATE_1(@Payload Earned earned) {
+        try {
+            if (earned.isMe()) {
+                // view 객체 조회
+                List<Mypage> mypageList = mypageRepository.findByCheckInId(earned.getCheckInId());
+                for(Mypage mypage : mypageList){
+                    // view 객체에 이벤트의 eventDirectValue 를 set 함
+                    mypage.setEarnId(earned.getId());
+                    mypage.setPoint(earned.getPoint());
+                    // view 레파지 토리에 save
+                    mypageRepository.save(mypage);
+                }
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+}
 ```
-
-파이선 애플리케이션을 컴파일하고 실행하기 위한 도커파일은 아래와 같다 (운영단계에서 할일인가? 아니다 여기 까지가 개발자가 할일이다. Immutable Image):
-```
-FROM python:2.7-slim
-WORKDIR /app
-ADD . /app
-RUN pip install --trusted-host pypi.python.org -r requirements.txt
-ENV NAME World
-EXPOSE 8090
-CMD ["python", "policy-handler.py"]
-```
-
 
 ## 동기식 호출 과 Fallback 처리
 
