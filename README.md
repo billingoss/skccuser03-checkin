@@ -18,7 +18,6 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
     - [동기식 호출 과 Fallback 처리](#동기식-호출-과-Fallback-처리)
     - [비동기식 호출 과 Eventual Consistency](#비동기식-호출-과-Eventual-Consistency)
   - [운영](#운영)
-    - [CI/CD 설정](#cicd설정)
     - [오토스케일 아웃](#오토스케일-아웃)
     - [Istio 적용](#Istio 적용)
     - [Kiali](#Kiali)
