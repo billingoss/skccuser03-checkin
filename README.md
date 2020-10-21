@@ -18,10 +18,10 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
     - [동기식 호출 과 Fallback 처리](#동기식-호출-과-Fallback-처리)
     - [비동기식 호출 과 Eventual Consistency](#비동기식-호출-과-Eventual-Consistency)
   - [운영](#운영)
+    - [CI/CD 설정](#cicd설정)
+    - [동기식 호출 / 서킷 브레이킹 / 장애격리](#동기식-호출-서킷-브레이킹-장애격리)
     - [오토스케일 아웃](#오토스케일-아웃)
-    - [Istio 적용](#Istio 적용)
-    - [Kiali](#Kiali)
-    - [Jaeger](#Jaeger)
+    - [무정지 재배포](#무정지-재배포)
 
 # 서비스 시나리오
 
@@ -75,7 +75,7 @@ CNA 개발에 요구되는 체크포인트를 만족하기 위하여 분석/설�
 ### 어그리게잇으로 묶기
 ![image](https://user-images.githubusercontent.com/70302884/96574602-a1cb7b80-130a-11eb-8bf7-c15dee072f02.png)
 
-    - (내용 업데이트 필요) pay의 지불, point 의 차감은 그와 연결된 command 와 event 들에 의하여 트랜잭션이 유지되어야 하는 단위로 그들 끼리 묶어줌
+    - pay의 지불, point 의 차감은 그와 연결된 command 와 event 들에 의하여 트랜잭션이 유지되어야 하는 단위로 그들 끼리 묶어줌
 
 ### 바운디드 컨텍스트로 묶기
 
