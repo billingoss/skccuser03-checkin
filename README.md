@@ -376,44 +376,46 @@ public class MypageViewHandler {
 
 ## 동기식 호출 과 Fallback 처리
 
-분석단계에서의 조건 중 하나로 주문(app)->결제(pay) 간의 호출은 동기식 일관성을 유지하는 트랜잭션으로 처리하기로 하였다. 호출 프로토콜은 이미 앞서 Rest Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 한다. 
+분석단계에서의 조건 중 하나로 포인트결제(pay)->포인트차감(point) 간의 호출은 동기식 일관성을 유지하는 트랜잭션으로 처리하기로 하였다. 호출 프로토콜은 이미 앞서 Rest Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 한다. 
 
-- 결제서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
+- 결제서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현
 
 ```
-# (app) 결제이력Service.java
+@FeignClient(name="point", url="${api.point.url}")
+public interface DeductService {
 
-package fooddelivery.external;
-
-@FeignClient(name="pay", url="http://localhost:8082")//, fallback = 결제이력ServiceFallback.class)
-public interface 결제이력Service {
-
-    @RequestMapping(method= RequestMethod.POST, path="/결제이력s")
-    public void 결제(@RequestBody 결제이력 pay);
+    @RequestMapping(method= RequestMethod.GET, path="/deducts")
+    public void pay(@RequestBody Deduct deduct);
 
 }
 ```
 
 - 주문을 받은 직후(@PostPersist) 결제를 요청하도록 처리
-```
-# Order.java (Entity)
 
+```
     @PostPersist
     public void onPostPersist(){
+        Paid paid = new Paid();
+        BeanUtils.copyProperties(this, paid);
+        paid.publishAfterCommit();
 
-        fooddelivery.external.결제이력 pay = new fooddelivery.external.결제이력();
-        pay.setOrderId(getOrderId());
-        
-        Application.applicationContext.getBean(fooddelivery.external.결제이력Service.class)
-                .결제(pay);
+        //Following code causes dependency to external APIs
+        // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
+
+        nosmoke.external.Deduct deduct = new nosmoke.external.Deduct();
+        // mappings goes here
+        deduct.setPoint(this.getPoint());
+        deduct.setPayId(this.getId());
+        PayApplication.applicationContext.getBean(nosmoke.external.DeductService.class)
+            .pay(deduct);
     }
 ```
 
-- 동기식 호출에서는 호출 시간에 따른 타임 커플링이 발생하며, 결제 시스템이 장애가 나면 주문도 못받는다는 것을 확인:
+- 동기식 호출에서는 호출 시간에 따른 타임 커플링이 발생하며, point 시스템이 장애가 나면 주문도 못받는다는 것을 확인:
 
 
 ```
-# 결제 (pay) 서비스를 잠시 내려놓음 (ctrl+c)
+# point 서비스를 잠시 내려놓음 (spring-boot:stop)
 
 #주문처리
 http localhost:8081/orders item=통닭 storeId=1   #Fail
