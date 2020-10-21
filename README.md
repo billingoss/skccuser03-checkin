@@ -577,7 +577,7 @@ http http://gateway:8080/earns/1  #point 서비스에 gateway를 통해 진입(�
 
 ## Jaeger
 
-* Tracing Server - Jaeger를 적용하였다. 아래는 18:20 이전 gateway로 동기 호출된 결과에 대해 Trace 결과를 보여주고 있음을 
+* Tracing Server - Jaeger를 적용하였다. 아래는 18:20 이전 gateway로 동기 호출된 결과에 대해 Trace 결과를 보여주고 있음을 확인 
 
 ![image](https://user-images.githubusercontent.com/16397080/96666714-ab002b00-1392-11eb-985a-7f643570ce99.png)
 
